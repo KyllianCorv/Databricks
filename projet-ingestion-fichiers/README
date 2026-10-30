@@ -1,0 +1,24 @@
+# Projet 2 : ingestion de fichiers avec Auto Loader
+
+## Objectif
+Charger automatiquement des fichiers CSV de ventes déposés dans un Volume,
+sans retraiter les fichiers déjà vus, puis produire des agrégats.
+
+## Architecture
+| Couche | Table | Rôle |
+|---|---|---|
+| Bronze | `ventes.bronze_ventes` | Fichiers bruts chargés par Auto Loader |
+| Silver | `ventes.silver_ventes` | Données typées, chiffre d'affaires calculé |
+| Gold | `ventes.gold_ca_jour`, `ventes.gold_top_produits` | Agrégats par magasin, jour et produit |
+
+## Notebooks
+1. `01_generer_fichiers` : simule l'arrivée de fichiers CSV
+2. `02_bronze_ventes` : ingestion incrémentale (Auto Loader)
+3. `03_silver_ventes` : nettoyage et typage
+4. `04_gold_ventes` : agrégats et analyses (fonctions de fenêtre)
+
+## Automatisation
+Un Job Databricks enchaîne bronze, silver et gold.
+
+## Technologies
+Databricks, Auto Loader, Delta Lake, Spark SQL, Python.
