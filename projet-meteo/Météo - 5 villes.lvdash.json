@@ -73,7 +73,7 @@
   "pages": [
     {
       "name": "fcbe659f",
-      "displayName": "Dashbaord",
+      "displayName": "Météo",
       "layout": [
         {
           "widget": {
@@ -189,16 +189,23 @@
             "spec": {
               "frame": {
                 "showTitle": true,
-                "title": "Précipitations par jour"
+                "title": {
+                  "value": "Précipitations par jour",
+                  "fields": []
+                }
               },
               "version": 3,
               "widgetType": "bar",
               "encodings": {
                 "x": {
                   "fieldName": "jour",
+                  "format": {
+                    "type": "date",
+                    "date": "locale-number-month"
+                  },
                   "displayName": "jour",
                   "scale": {
-                    "type": "categorical"
+                    "type": "temporal"
                   }
                 },
                 "y": {
@@ -361,7 +368,7 @@
           },
           "position": {
             "x": 0,
-            "y": 20,
+            "y": 27,
             "width": 6,
             "height": 4
           }
@@ -431,7 +438,7 @@
           },
           "position": {
             "x": 6,
-            "y": 20,
+            "y": 27,
             "width": 6,
             "height": 4
           }
@@ -496,7 +503,7 @@
           },
           "position": {
             "x": 0,
-            "y": 24,
+            "y": 31,
             "width": 12,
             "height": 4
           }
@@ -582,7 +589,7 @@
           },
           "position": {
             "x": 0,
-            "y": 28,
+            "y": 35,
             "width": 12,
             "height": 6
           }
@@ -727,20 +734,16 @@
                   "datasetName": "7143fc3e",
                   "fields": [
                     {
+                      "name": "ville",
+                      "expression": "`ville`"
+                    },
+                    {
                       "name": "jour",
                       "expression": "`jour`"
                     },
                     {
                       "name": "avg(temp_moy)",
                       "expression": "AVG(`temp_moy`)"
-                    },
-                    {
-                      "name": "avg(temp_moy_7j)",
-                      "expression": "AVG(`temp_moy_7j`)"
-                    },
-                    {
-                      "name": "ville",
-                      "expression": "`ville`"
                     }
                   ],
                   "disaggregated": false
@@ -748,46 +751,36 @@
               }
             ],
             "spec": {
-              "facet": {
-                "type": "wrap",
-                "fieldName": "ville",
-                "scale": {
-                  "type": "categorical"
-                }
-              },
               "frame": {
                 "showTitle": true,
-                "title": "Température moyenne et moyenne glissante 7 jours"
+                "title": "Température moyenne par ville"
               },
               "version": 3,
-              "mark": {
-                "linePatterns": [
-                  null,
-                  "dashed"
-                ]
-              },
               "widgetType": "line",
               "encodings": {
                 "x": {
                   "fieldName": "jour",
-                  "displayName": "jour",
+                  "format": {
+                    "type": "date",
+                    "date": "locale-number-month"
+                  },
+                  "displayName": "Jour",
                   "scale": {
-                    "type": "categorical"
+                    "type": "temporal"
                   }
                 },
                 "y": {
-                  "fields": [
-                    {
-                      "fieldName": "avg(temp_moy)",
-                      "displayName": "Température moyenne (°C)"
-                    },
-                    {
-                      "fieldName": "avg(temp_moy_7j)",
-                      "displayName": "Moyenne glissante 7 j (°C)"
-                    }
-                  ],
+                  "fieldName": "avg(temp_moy)",
+                  "displayName": "Température moyenne (°C)",
                   "scale": {
                     "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "ville",
+                  "displayName": "Ville",
+                  "scale": {
+                    "type": "categorical"
                   }
                 }
               },
@@ -880,6 +873,78 @@
             "x": 0,
             "y": 15,
             "width": 12,
+            "height": 12
+          }
+        },
+        {
+          "widget": {
+            "name": "moyenne_glissante_7j",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "7143fc3e",
+                  "fields": [
+                    {
+                      "name": "ville",
+                      "expression": "`ville`"
+                    },
+                    {
+                      "name": "jour",
+                      "expression": "`jour`"
+                    },
+                    {
+                      "name": "avg(temp_moy_7j)",
+                      "expression": "AVG(`temp_moy_7j`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Moyenne glissante 7 jours par ville"
+              },
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "jour",
+                  "format": {
+                    "type": "date",
+                    "date": "locale-number-month"
+                  },
+                  "displayName": "Jour",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(temp_moy_7j)",
+                  "displayName": "Moyenne glissante 7 j (°C)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "ville",
+                  "displayName": "Ville",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 41,
+            "width": 6,
             "height": 5
           }
         }
