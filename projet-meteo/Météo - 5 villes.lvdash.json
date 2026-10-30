@@ -1,0 +1,897 @@
+{
+  "datasets": [
+    {
+      "name": "a7502c17",
+      "displayName": "meteo_jour",
+      "queryLines": [
+        "SELECT ville, jour, temp_min, temp_max, temp_moy, pluie_totale, nb_mesures\r\n",
+        "FROM workspace.meteo.gold_daily_weather\r\n"
+      ]
+    },
+    {
+      "name": "7143fc3e",
+      "displayName": "meteo_tendance",
+      "queryLines": [
+        "SELECT\r\n",
+        "    ville, jour, temp_moy,\r\n",
+        "    ROUND(AVG(temp_moy) OVER (PARTITION BY ville ORDER BY jour\r\n",
+        "          ROWS BETWEEN 6 PRECEDING AND CURRENT ROW), 1) AS temp_moy_7j,\r\n",
+        "    ROUND(temp_moy - LAG(temp_moy) OVER (PARTITION BY ville ORDER BY jour), 1) AS variation_veille\r\n",
+        "FROM workspace.meteo.gold_daily_weather"
+      ]
+    },
+    {
+      "name": "2820e0f0",
+      "displayName": "meteo_classement",
+      "queryLines": [
+        "SELECT\r\n",
+        "    ville,\r\n",
+        "    ROUND(AVG(temp_moy), 1) AS temp_moy_periode,\r\n",
+        "    ROUND(SUM(pluie_totale), 1) AS pluie_periode,\r\n",
+        "    RANK() OVER (ORDER BY AVG(temp_moy) DESC) AS rang_chaleur,\r\n",
+        "    RANK() OVER (ORDER BY SUM(pluie_totale) DESC) AS rang_pluie\r\n",
+        "FROM workspace.meteo.gold_daily_weather\r\n",
+        "GROUP BY ville"
+      ]
+    },
+    {
+      "name": "a88a42ed",
+      "displayName": "meteo_series_pluie",
+      "queryLines": [
+        "WITH j AS (\r\n",
+        "    SELECT ville, jour, pluie_totale >= 1 AS pluie\r\n",
+        "    FROM workspace.meteo.gold_daily_weather\r\n",
+        "),\r\n",
+        "g AS (\r\n",
+        "    SELECT *,\r\n",
+        "           ROW_NUMBER() OVER (PARTITION BY ville ORDER BY jour)\r\n",
+        "         - ROW_NUMBER() OVER (PARTITION BY ville, pluie ORDER BY jour) AS grp\r\n",
+        "    FROM j\r\n",
+        ")\r\n",
+        "SELECT ville, MIN(jour) AS debut, MAX(jour) AS fin, COUNT(*) AS nb_jours\r\n",
+        "FROM g\r\n",
+        "WHERE pluie\r\n",
+        "GROUP BY ville, grp\r\n",
+        "ORDER BY nb_jours DESC"
+      ]
+    },
+    {
+      "name": "fe2a4ec5",
+      "displayName": "meteo_records",
+      "queryLines": [
+        "SELECT 'Jour le plus chaud' AS record, ville, jour, temp_max AS valeur\r\n",
+        "FROM (SELECT * FROM workspace.meteo.gold_daily_weather ORDER BY temp_max DESC LIMIT 1)\r\n",
+        "UNION ALL\r\n",
+        "SELECT 'Jour le plus froid', ville, jour, temp_min\r\n",
+        "FROM (SELECT * FROM workspace.meteo.gold_daily_weather ORDER BY temp_min ASC LIMIT 1)\r\n",
+        "UNION ALL\r\n",
+        "SELECT 'Jour le plus pluvieux', ville, jour, pluie_totale\r\n",
+        "FROM (SELECT * FROM workspace.meteo.gold_daily_weather ORDER BY pluie_totale DESC LIMIT 1)"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "fcbe659f",
+      "displayName": "Dashbaord",
+      "layout": [
+        {
+          "widget": {
+            "name": "titre_meteo",
+            "multilineTextboxSpec": {
+              "lines": [
+                "# Météo - 5 villes\n",
+                "\n",
+                "Suivi quotidien des températures et précipitations pour 5 villes : moyenne et moyenne glissante sur 7 jours, min/max journaliers, variation par rapport à la veille, précipitations, classements des villes, plus longues séries de pluie consécutives (≥ 1 mm) et records de la période.\n",
+                "\n",
+                "Utilisez le filtre **Ville** pour concentrer l'analyse sur une ou plusieurs villes."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "records",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "fe2a4ec5",
+                  "fields": [
+                    {
+                      "name": "record",
+                      "expression": "`record`"
+                    },
+                    {
+                      "name": "ville",
+                      "expression": "`ville`"
+                    },
+                    {
+                      "name": "jour",
+                      "expression": "`jour`"
+                    },
+                    {
+                      "name": "valeur",
+                      "expression": "`valeur`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Records de la période"
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "record"
+                  },
+                  {
+                    "fieldName": "ville"
+                  },
+                  {
+                    "fieldName": "jour"
+                  },
+                  {
+                    "fieldName": "valeur"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 3,
+            "width": 9,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "precipitations_jour",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a7502c17",
+                  "fields": [
+                    {
+                      "name": "ville",
+                      "expression": "`ville`"
+                    },
+                    {
+                      "name": "jour",
+                      "expression": "`jour`"
+                    },
+                    {
+                      "name": "sum(pluie_totale)",
+                      "expression": "SUM(`pluie_totale`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Précipitations par jour"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "jour",
+                  "displayName": "jour",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(pluie_totale)",
+                  "displayName": "pluie_totale",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "ville",
+                  "displayName": "ville",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 10,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "variation_veille",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "7143fc3e",
+                  "fields": [
+                    {
+                      "name": "ville",
+                      "expression": "`ville`"
+                    },
+                    {
+                      "name": "jour",
+                      "expression": "`jour`"
+                    },
+                    {
+                      "name": "avg(variation_veille)",
+                      "expression": "AVG(`variation_veille`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Variation de température vs veille"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "jour",
+                  "displayName": "jour",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(variation_veille)",
+                  "displayName": "variation_veille",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "ville",
+                  "displayName": "ville",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 10,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "classement_temp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "2820e0f0",
+                  "fields": [
+                    {
+                      "name": "ville",
+                      "expression": "`ville`"
+                    },
+                    {
+                      "name": "avg(temp_moy_periode)",
+                      "expression": "AVG(`temp_moy_periode`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Classement - température moyenne",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "ville",
+                  "displayName": "ville",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(temp_moy_periode)",
+                  "displayName": "temp_moy_periode",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "ville",
+                  "displayName": "ville",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 20,
+            "width": 6,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "classement_pluie",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "2820e0f0",
+                  "fields": [
+                    {
+                      "name": "ville",
+                      "expression": "`ville`"
+                    },
+                    {
+                      "name": "sum(pluie_periode)",
+                      "expression": "SUM(`pluie_periode`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Classement - pluie totale",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "ville",
+                  "displayName": "ville",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(pluie_periode)",
+                  "displayName": "pluie_periode",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "ville",
+                  "displayName": "ville",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 20,
+            "width": 6,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "series_pluie",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a88a42ed",
+                  "fields": [
+                    {
+                      "name": "ville",
+                      "expression": "`ville`"
+                    },
+                    {
+                      "name": "debut",
+                      "expression": "`debut`"
+                    },
+                    {
+                      "name": "fin",
+                      "expression": "`fin`"
+                    },
+                    {
+                      "name": "nb_jours",
+                      "expression": "`nb_jours`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Séries de jours de pluie consécutifs (≥ 1 mm)"
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "ville"
+                  },
+                  {
+                    "fieldName": "debut"
+                  },
+                  {
+                    "fieldName": "fin"
+                  },
+                  {
+                    "fieldName": "nb_jours"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 24,
+            "width": 12,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "detail_quotidien",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a7502c17",
+                  "fields": [
+                    {
+                      "name": "ville",
+                      "expression": "`ville`"
+                    },
+                    {
+                      "name": "jour",
+                      "expression": "`jour`"
+                    },
+                    {
+                      "name": "temp_min",
+                      "expression": "`temp_min`"
+                    },
+                    {
+                      "name": "temp_max",
+                      "expression": "`temp_max`"
+                    },
+                    {
+                      "name": "temp_moy",
+                      "expression": "`temp_moy`"
+                    },
+                    {
+                      "name": "pluie_totale",
+                      "expression": "`pluie_totale`"
+                    },
+                    {
+                      "name": "nb_mesures",
+                      "expression": "`nb_mesures`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Détail quotidien"
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "ville"
+                  },
+                  {
+                    "fieldName": "jour"
+                  },
+                  {
+                    "fieldName": "temp_min"
+                  },
+                  {
+                    "fieldName": "temp_max"
+                  },
+                  {
+                    "fieldName": "temp_moy"
+                  },
+                  {
+                    "fieldName": "pluie_totale"
+                  },
+                  {
+                    "fieldName": "nb_mesures"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 28,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "filtre_ville",
+            "queries": [
+              {
+                "name": "dashboards/01f1d42f33da14c3b5316d35f2a8b069/datasets/01f1d42f38e41253a9f441bfbbf0c3e6_ville",
+                "query": {
+                  "datasetName": "a7502c17",
+                  "fields": [
+                    {
+                      "name": "ville",
+                      "expression": "`ville`"
+                    },
+                    {
+                      "name": "ville_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d42f33da14c3b5316d35f2a8b069/datasets/01f1d42f4cf8198a8eb80a1e0dddb063_ville",
+                "query": {
+                  "datasetName": "7143fc3e",
+                  "fields": [
+                    {
+                      "name": "ville",
+                      "expression": "`ville`"
+                    },
+                    {
+                      "name": "ville_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d42f33da14c3b5316d35f2a8b069/datasets/01f1d42f50341211b27cef91ec166b75_ville",
+                "query": {
+                  "datasetName": "2820e0f0",
+                  "fields": [
+                    {
+                      "name": "ville",
+                      "expression": "`ville`"
+                    },
+                    {
+                      "name": "ville_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d42f33da14c3b5316d35f2a8b069/datasets/01f1d42f530319a59842c8ccf45b5ecf_ville",
+                "query": {
+                  "datasetName": "a88a42ed",
+                  "fields": [
+                    {
+                      "name": "ville",
+                      "expression": "`ville`"
+                    },
+                    {
+                      "name": "ville_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d42f33da14c3b5316d35f2a8b069/datasets/01f1d42f57581fa8a4af9e591b9bb15f_ville",
+                "query": {
+                  "datasetName": "fe2a4ec5",
+                  "fields": [
+                    {
+                      "name": "ville",
+                      "expression": "`ville`"
+                    },
+                    {
+                      "name": "ville_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Ville"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "ville",
+                    "queryName": "dashboards/01f1d42f33da14c3b5316d35f2a8b069/datasets/01f1d42f38e41253a9f441bfbbf0c3e6_ville"
+                  },
+                  {
+                    "fieldName": "ville",
+                    "queryName": "dashboards/01f1d42f33da14c3b5316d35f2a8b069/datasets/01f1d42f4cf8198a8eb80a1e0dddb063_ville"
+                  },
+                  {
+                    "fieldName": "ville",
+                    "queryName": "dashboards/01f1d42f33da14c3b5316d35f2a8b069/datasets/01f1d42f50341211b27cef91ec166b75_ville"
+                  },
+                  {
+                    "fieldName": "ville",
+                    "queryName": "dashboards/01f1d42f33da14c3b5316d35f2a8b069/datasets/01f1d42f530319a59842c8ccf45b5ecf_ville"
+                  },
+                  {
+                    "fieldName": "ville",
+                    "queryName": "dashboards/01f1d42f33da14c3b5316d35f2a8b069/datasets/01f1d42f57581fa8a4af9e591b9bb15f_ville"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "temp_moy_glissante",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "7143fc3e",
+                  "fields": [
+                    {
+                      "name": "jour",
+                      "expression": "`jour`"
+                    },
+                    {
+                      "name": "avg(temp_moy)",
+                      "expression": "AVG(`temp_moy`)"
+                    },
+                    {
+                      "name": "avg(temp_moy_7j)",
+                      "expression": "AVG(`temp_moy_7j`)"
+                    },
+                    {
+                      "name": "ville",
+                      "expression": "`ville`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "facet": {
+                "type": "wrap",
+                "fieldName": "ville",
+                "scale": {
+                  "type": "categorical"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Température moyenne et moyenne glissante 7 jours"
+              },
+              "version": 3,
+              "mark": {
+                "linePatterns": [
+                  null,
+                  "dashed"
+                ]
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "jour",
+                  "displayName": "jour",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fields": [
+                    {
+                      "fieldName": "avg(temp_moy)",
+                      "displayName": "Température moyenne (°C)"
+                    },
+                    {
+                      "fieldName": "avg(temp_moy_7j)",
+                      "displayName": "Moyenne glissante 7 j (°C)"
+                    }
+                  ],
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 12,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "temp_min_max",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a7502c17",
+                  "fields": [
+                    {
+                      "name": "jour",
+                      "expression": "`jour`"
+                    },
+                    {
+                      "name": "avg(temp_min)",
+                      "expression": "AVG(`temp_min`)"
+                    },
+                    {
+                      "name": "avg(temp_max)",
+                      "expression": "AVG(`temp_max`)"
+                    },
+                    {
+                      "name": "ville",
+                      "expression": "`ville`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "facet": {
+                "type": "wrap",
+                "fieldName": "ville",
+                "scale": {
+                  "type": "categorical"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Températures min et max par jour"
+              },
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "jour",
+                  "displayName": "jour",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fields": [
+                    {
+                      "fieldName": "avg(temp_min)",
+                      "displayName": "Température min (°C)"
+                    },
+                    {
+                      "fieldName": "avg(temp_max)",
+                      "displayName": "Température max (°C)"
+                    }
+                  ],
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 15,
+            "width": 12,
+            "height": 5
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}
